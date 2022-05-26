@@ -1,3 +1,4 @@
+import multiprocessing
 from infocyte import hunt_base, target, controller, agent, schedule
 import random 
 import uuid
@@ -328,14 +329,14 @@ def mock_rts():
 if __name__=="__main__":
 
     for x in range(agent_count):
-        p1 = Process(target=register_agent())
+        p1 = multiprocessing.Process(target=register_agent)
         p1.start()
         p1.join()
 
     print(f"{len(agent_ids)} agents registered, waiting 70 for memcache before proceeding")
     time.sleep(70)
 
-    p2 = Process(target=mock_rts())
+    p2 = Process(target=mock_rts)
     p2.start()
     p2.join()
 
