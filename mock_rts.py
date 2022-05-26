@@ -19,8 +19,9 @@ sch = schedule.Schedule()
 ts = time.gmtime()
 current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
 
-#base.base_url = "https://testhomer19"
-#base.api_token = "api token"
+#set url and token values here
+#os.environ['HUNT_URL'] = "https://testhomer19.infocyte.com"
+#os.environ['HUNT_TOKEN'] = "api token"
 process_payload = "/home/homer/Downloads/HostSurvey/process-0000.ndjson.gz"
 account_payload = "/home/homer/Downloads/HostSurvey/account-0000.ndjson.gz"
 memscan_payload_path = "" #todo
