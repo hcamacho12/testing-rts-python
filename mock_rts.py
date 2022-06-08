@@ -1,4 +1,4 @@
-import multiprocessing
+
 from infocyte import hunt_base, target, controller, agent, schedule
 import random 
 import uuid
@@ -9,7 +9,7 @@ import requests
 import gzip
 from multiprocessing import Process
 import itertools
-import os
+
 
 cnt = controller.ControllerGroups()
 tgt = target.Target()
@@ -23,13 +23,15 @@ current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
 #set url and token values here
 #os.environ['HUNT_URL'] = "https://testhomer19.infocyte.com"
 #os.environ['HUNT_TOKEN'] = "api token"
-agent_count = 100
+agent_count = 2
 process_payload = "/home/homer/Downloads/HostSurvey/process-0000.ndjson.gz"
 account_payload = "/home/homer/Downloads/HostSurvey/account-0000.ndjson.gz"
 memscan_payload_path = "" #todo
 av_payload_path = "" #todo
 agent_ids = []
 agent_ips = []
+upload_urls = []
+filename_manifest = []
 
 def new_target():
     #new target group
@@ -190,9 +192,23 @@ def agent_heartbeat(agent_id, agent_ip):
 
     return job_info
 
+def fetch_upload_url(filename, upload_url_headers):
+    get_upload_url = "/api/agents/uploadUrl"
+    filename_manifest.append(filename)
+    print(filename)
+    upload_url_headers['filename'] = filename
+
+    url_response = base.request_get(get_upload_url, request_headers=upload_url_headers)
+    #print(f"upload url headers {upload_url_headers}")
+    url_text = eval(url_response.text)
+    upload_urls.append(url_text[0])
+
+    return upload_urls
+
 def mock_rts():
 
     for (a, b) in itertools.zip_longest(agent_ids, agent_ips):
+        upload_urls.clear()
         agent_id = a
         agent_ip = b
         job_info = agent_heartbeat(a, b)
@@ -247,22 +263,28 @@ def mock_rts():
         """
         get_upload_url = "/api/agents/uploadUrl"
         #expecting dict of items to be included in scan payload ["process", "autostart", etc.] 
+        # how many upload urls?
         item_type = survey_payload_items
         item_type_count = len(item_type)
         x = 0
         while x <= item_type_count:
             if x == item_type_count:
-                upload_url_headers['filename'] = "manifest.json.gz"
-                print("manifest.json")
-            else:
-                filename = str(item_type[x]) + "-0000.ndjson.gz"
-                print(filename)
+                filename = "manifest.json.gz"
                 upload_url_headers['filename'] = filename
-                filename_manifest.append(filename)
-            url_response = base.request_get(get_upload_url, request_headers=upload_url_headers)
-            print(f"upload url headers {upload_url_headers}")
-            url_text = eval(url_response.text)
-            upload_urls.append(url_text[0])
+                upload_urls = fetch_upload_url(filename, upload_url_headers)
+            else:
+                if item_type[x] == "process":
+                    y = 0
+                    while y <= 5:#range of process ndjson files to upload
+                        filename =f"{item_type[0]}-000{y}.ndjson.gz"
+                        filename_manifest.append(filename)
+                        upload_urls = fetch_upload_url(filename, upload_url_headers)
+                        y += 1
+                else:
+                    filename =f"{item_type[x]}-0000.ndjson.gz"
+                    filename_manifest.append(filename)
+                    fetch_upload_url(filename, upload_url_headers)
+
             x += 1
 
         x = 0
@@ -302,10 +324,9 @@ def mock_rts():
                                 
             else:
                 headers['filename'] = filename_manifest[x]
-                payload_name = item_type[x]
-                if payload_name == "process":
+                if 'process' in filename_manifest[x]:
                     gzip_survey = open(process_payload, "rb")
-                elif payload_name == "account":
+                elif 'account' in filename_manifest[x]:
                     gzip_survey = open(account_payload, "rb")
                 else:
                     raise Exception("Invalid payload name specified")
@@ -328,17 +349,13 @@ def mock_rts():
 
 if __name__=="__main__":
 
+    process_array = []
     for x in range(agent_count):
-        p1 = multiprocessing.Process(target=register_agent)
-        p1.start()
-        p1.join()
+        register_agent()
 
-    print(f"{len(agent_ids)} agents registered, waiting 70 for memcache before proceeding")
+    print(f"{agent_count} agents registered, waiting 70 for memcache before proceeding")
     time.sleep(70)
 
-    p2 = Process(target=mock_rts)
-    p2.start()
-    p2.join()
-
+    mock_rts()
 
 print(f"Done!")
