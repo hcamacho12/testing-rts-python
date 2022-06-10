@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""Mock rts loading test
+
+
+"""
 
 from infocyte import hunt_base, target, controller, agent, schedule
 import random 
@@ -23,14 +30,22 @@ current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
 #set url and token values here
 #os.environ['HUNT_URL'] = "https://testhomer19.infocyte.com"
 #os.environ['HUNT_TOKEN'] = "api token"
-agent_count = 2
+
+#number of agents
+agent_count = 100
+#number of process ndjson payloads per mock rts upload
+proc_payload_count = 5
+# agent memcache sleep. how long to wait(s) before proceeding with rts scans after agent registration and approva
+agt_mem = 70
+
+#survey payload files stored locally, can be generated using offline scan
 process_payload = "/home/homer/Downloads/HostSurvey/process-0000.ndjson.gz"
 account_payload = "/home/homer/Downloads/HostSurvey/account-0000.ndjson.gz"
 memscan_payload_path = "" #todo
 av_payload_path = "" #todo
+
 agent_ids = []
 agent_ips = []
-upload_urls = []
 filename_manifest = []
 
 def new_target():
@@ -52,8 +67,9 @@ def new_target():
     else:
         raise Exception(f"Unexpected status code {target_create_response.status_code}")
     
-def register_agent():
-    target_data = new_target()
+def register_agent(target_info):
+    #passing target group info into variable instead of creating a new tg each time
+    target_data = target_info
     #new agent registration
     agent_id = str(uuid.uuid1()) 
     agent_ids.append(agent_id)
@@ -88,13 +104,10 @@ def register_agent():
 
     register_response = base.request_post(api_endpoint, request_headers=register_heads, request_body=body)
     if register_response.status_code == 200:
-        resp_agent_id = agent_id
+        #resp_agent_id = agent_id
         print(f"agent with id: {agent_id} created")
         response = agt.approve_agent(agent_id)
-        assign_agent_tg(agent_id, target_data[1])
-
-        #return [target_data, agent_id, agent_ip]
-        #return [agent_heartbeat(agent_id, agent_ip), target_data, agent_id, agent_ip]   
+        assign_agent_tg(agent_id, target_data[1])  
     else:
         raise Exception(f"agent register failure {register_response.status_code}\nresponse body {register_response.json()}")
 
@@ -105,9 +118,6 @@ def assign_agent_tg(agent_id, target_id):
         print(f"Agent {agent_id} assigned to target group {target_id}")
     else:
         raise Exception(f"Unexpected response status {tg_assign_response.status_code}")
-    """
-    print(f"agent {agent_id} succesfully registered and approved. waiting 70s for memcache to catch up")
-    time.sleep(70)"""
 
 def agent_heartbeat(agent_id, agent_ip):
     heartbeat_body = {
@@ -201,14 +211,14 @@ def fetch_upload_url(filename, upload_url_headers):
     url_response = base.request_get(get_upload_url, request_headers=upload_url_headers)
     #print(f"upload url headers {upload_url_headers}")
     url_text = eval(url_response.text)
-    upload_urls.append(url_text[0])
+    upload_url = url_text[0]
 
-    return upload_urls
+    return upload_url
 
 def mock_rts():
 
     for (a, b) in itertools.zip_longest(agent_ids, agent_ips):
-        upload_urls.clear()
+        #upload_urls.clear()
         agent_id = a
         agent_ip = b
         job_info = agent_heartbeat(a, b)
@@ -266,24 +276,28 @@ def mock_rts():
         # how many upload urls?
         item_type = survey_payload_items
         item_type_count = len(item_type)
+
         x = 0
         while x <= item_type_count:
             if x == item_type_count:
                 filename = "manifest.json.gz"
                 upload_url_headers['filename'] = filename
-                upload_urls = fetch_upload_url(filename, upload_url_headers)
+                upload_url = fetch_upload_url(filename, upload_url_headers)
+                upload_urls.append(upload_url)
             else:
                 if item_type[x] == "process":
                     y = 0
-                    while y <= 5:#range of process ndjson files to upload
+                    while y <= proc_payload_count:#range of process ndjson files to upload
                         filename =f"{item_type[0]}-000{y}.ndjson.gz"
                         filename_manifest.append(filename)
-                        upload_urls = fetch_upload_url(filename, upload_url_headers)
+                        upload_url = fetch_upload_url(filename, upload_url_headers)
+                        upload_urls.append(upload_url)
                         y += 1
                 else:
                     filename =f"{item_type[x]}-0000.ndjson.gz"
                     filename_manifest.append(filename)
-                    fetch_upload_url(filename, upload_url_headers)
+                    upload_url = fetch_upload_url(filename, upload_url_headers)
+                    upload_urls.append(upload_url)
 
             x += 1
 
@@ -349,12 +363,15 @@ def mock_rts():
 
 if __name__=="__main__":
 
-    process_array = []
-    for x in range(agent_count):
-        register_agent()
+    #create single target group to assign agents to
+    target_data = new_target()
 
-    print(f"{agent_count} agents registered, waiting 70 for memcache before proceeding")
-    time.sleep(70)
+    #register agents iterating over count specified in agent_count variable
+    for x in range(agent_count):
+        register_agent(target_data)
+
+    print(f"{agent_count} agents registered, waiting {agt_mem} seconds for memcache before proceeding")
+    time.sleep(agt_mem)
 
     mock_rts()
 
