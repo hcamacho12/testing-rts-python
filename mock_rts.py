@@ -15,12 +15,7 @@ import requests
 import gzip
 import itertools
 
-
-#cnt = controller.ControllerGroups()
-#tgt = target.Target()
 base = hunt_base.BaseRequests()
-#agt = agent.Agent()
-#sch = schedule.Schedule()
 a_mocks = agent_mocks.HuntAgent()
 disc_tab = discover_tab.DiscoverTab()
 
