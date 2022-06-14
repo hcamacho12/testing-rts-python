@@ -6,25 +6,23 @@
 
 """
 
-from infocyte import hunt_base, target, controller, agent, schedule
-from common import agent_mocks
-import random 
-import uuid
+from infocyte import hunt_base
+from common import agent_mocks, discover_tab
 import time
 import copy
 import json
 import requests
 import gzip
-from multiprocessing import Process
 import itertools
 
 
-cnt = controller.ControllerGroups()
-tgt = target.Target()
+#cnt = controller.ControllerGroups()
+#tgt = target.Target()
 base = hunt_base.BaseRequests()
-agt = agent.Agent()
-sch = schedule.Schedule()
+#agt = agent.Agent()
+#sch = schedule.Schedule()
 a_mocks = agent_mocks.HuntAgent()
+disc_tab = discover_tab.DiscoverTab()
 
 ts = time.gmtime()
 current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
@@ -34,7 +32,7 @@ current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
 #os.environ['HUNT_TOKEN'] = "api token"
 
 #number of agents
-agent_count = 5
+agent_count = 1
 #number of process ndjson payloads per mock rts upload
 proc_payload_count = 1
 # agent memcache sleep. how long to wait(s) before proceeding with rts scans after agent registration and approva
@@ -45,25 +43,6 @@ process_payload = "/home/homer/Downloads/HostSurvey/process-0000.ndjson.gz"
 account_payload = "/home/homer/Downloads/HostSurvey/account-0000.ndjson.gz"
 memscan_payload_path = "" #todo
 av_payload_path = "" #todo
-
-def new_target():
-    #new target group
-    controller_group_request = cnt.get_controller_group_by_field("name", "Controller Group 1")
-    controller_group_info = controller_group_request.json()
-    controller_group_id = controller_group_info[0]['id']
-    print(f"Controller group 1 id: {controller_group_id}")
-
-    target_create_response = tgt.new_target(f"new{random.randint(0, 999)}", controller_group_id)
-
-    if target_create_response.status_code == 200:
-        target_info = target_create_response.json()
-        target_id = target_info['id']
-        sch.continuous_monitoring(target_id)
-
-        return [target_info, target_id, controller_group_id]
-
-    else:
-        raise Exception(f"Unexpected status code {target_create_response.status_code}")
 
 def mock_rts():
 
@@ -214,7 +193,7 @@ def mock_rts():
 if __name__=="__main__":
 
     #create single target group to assign agents to
-    target_data = new_target()
+    target_data = disc_tab.monitored_target()
 
     #register agents iterating over count specified in agent_count variable
     # returns array of arrays agent_ids, agent_ips
