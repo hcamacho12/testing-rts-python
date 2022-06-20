@@ -30,7 +30,7 @@ current_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", ts)
 agent_count = 1
 #number of process ndjson payloads per mock rts upload
 proc_payload_count = 1
-# agent memcache sleep. how long to wait(s) before proceeding with rts scans after agent registration and approva
+# agent memcache sleep. how long to wait(s) before proceeding with rts scans after agent registration and approval
 agt_mem = 70
 
 #survey payload files stored locally, can be generated using offline scan
@@ -47,43 +47,14 @@ def mock_rts():
         agent_ip = b
         job_info = a_mocks.agent_heartbeat(a, b)
 
-        #complete mock scan and upload(processes & accounts only)
-        scan_task_id = job_info['scanId']
-        job_authenticator = job_info['authenticator']
-        progress_url =  "/api/agents/progress"
-
-        #first set of headers to update status of scan task
-        check_heads1 = copy.deepcopy(base.base_headers)
-        check_heads1['scanid'] = scan_task_id
-        check_heads1['authenticator'] = job_authenticator
-        check_heads1['replytype'] = "completed"
-        # headers for all subsequent progress heartbeats after inital progress 
-        check_heads2 = copy.deepcopy(base.base_headers)
-        check_heads2['authorization'] = 'agent ' + agent_id
-        check_heads2['scanid'] = scan_task_id
-        check_heads2['authenticator'] = job_authenticator
-
-        check_body = {}
-        check_body['elapsed'] = 69
-        #post request to /survey/reply , headers: scanid, authenticator, replytype, body:{"elapsed":1}
-        response = base.request_post(progress_url, request_headers=check_heads1, request_body=check_body)
-        resp_stat = response.status_code
-        print(resp_stat)
-        x = 0
-        while resp_stat != 204 and x <= 10:
-            response = base.request_post(progress_url, request_headers=check_heads2, request_body=check_body)
-            resp_stat = resp_stat
-            print(resp_stat)
-            time.sleep(14)
-            x += 1
-            if x == 10 and resp_stat != 204:
-                raise Exception("Failed!, job not ready for upload")
+        scan_data = a_mocks.progress_scan(job_info, agent_id)
+        job_authenticator = scan_data[0]
+        scan_task_id = scan_data[1]
 
         #get list of upload urls for item types in scan
         upload_urls = []
         filename_manifest = []
         survey_payload_items = ['process', 'account']
-        #item_type_count = 1 #number of items like processes, accounts etc, +1 for manifest.json
 
         upload_url_headers = copy.deepcopy(base.base_headers)
         upload_url_headers['authenticator'] = job_authenticator
@@ -139,7 +110,7 @@ def mock_rts():
                                     "architecture": "64-bit",
                                     "cpe23Uri": None,
                                     "domain": "fake.int",
-                                    "hostname": "fakehost.int",
+                                    "hostname": "fakeh'ost'.int",
                                     "ip": str(agent_ip),
                                     "agentId": str(agent_id),
                                     "osVersion": "Windows 5000"

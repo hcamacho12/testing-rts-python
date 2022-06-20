@@ -194,3 +194,46 @@ class HuntAgent(object):
         upload_url = url_text[0]
 
         return upload_url
+
+    def custom_headers(self, headers={}):
+        headers.update(copy.deepcopy(base.base_headers))
+        return headers 
+        
+
+
+    def progress_scan(self, scan_job, agent_id):
+        scan_task_id = scan_job['scanId']
+        job_authenticator = scan_job['authenticator']
+
+        progress_url =  "/api/agents/progress"
+
+        job_headers = {"scanid":scan_task_id, "authenticator":job_authenticator}
+        scan_headers = self.custom_headers(job_headers)
+
+        #first set of headers to update status of scan task
+        heads1 = {"scanid":scan_task_id, "authenticator":job_authenticator, "replytype":"completed"}
+        check_heads1 = self.custom_headers(heads1)
+
+        # headers for all subsequent progress heartbeats after inital progress 
+        heads2 = {"scanid":scan_task_id, "authenticator":job_authenticator}
+        check_heads2 = self.custom_headers(heads2)
+        check_heads2['authorization'] = 'agent ' + agent_id
+
+        check_body = {}
+        check_body['elapsed'] = 69
+        #post request to /survey/reply , headers: scanid, authenticator, replytype, body:{"elapsed":1}
+
+        response = base.request_post(progress_url, request_headers=check_heads1, request_body=check_body)
+        resp_stat = response.status_code
+        print(resp_stat)
+        x = 0
+        while resp_stat != 204 and x <= 10:
+            response = base.request_post(progress_url, request_headers=check_heads2, request_body=check_body)
+            resp_stat = resp_stat
+            print(resp_stat)
+            time.sleep(14)
+            x += 1
+            if x == 10 and resp_stat != 204:
+                raise Exception("Failed!, job not ready for upload")
+
+        return [job_authenticator, scan_task_id]
