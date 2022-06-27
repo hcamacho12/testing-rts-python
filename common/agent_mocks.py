@@ -183,25 +183,54 @@ class HuntAgent(object):
         return job_info
 
     def fetch_upload_url(self, filename, upload_url_headers):
+        """get s3 url for survey upload
+
+        Mock scan upload requires pre-authorized s3 url per each payload piece
+        Request returns array of 2 upload urls.
+
+        Parameters:
+            - filename: name of file to be uploaded
+            - upload_url_headers: http header dict for request
+        """
+
         get_upload_url = "/api/agents/uploadUrl"
+        # append specified filename for manifest creation
         filename_manifest.append(filename)
         print(filename)
+        # filename of file to be uploaded needs to be specified in headers, this should be different for every piece of survey
         upload_url_headers['filename'] = filename
 
         url_response = base.request_get(get_upload_url, request_headers=upload_url_headers)
-        #print(f"upload url headers {upload_url_headers}")
         url_text = eval(url_response.text)
+        #just using first url returned from request
         upload_url = url_text[0]
 
         return upload_url
 
     def custom_headers(self, headers={}):
+        """construct base headers
+
+        base_headers includes: {"Authorization": api_token, "content-type": "application/json"}
+
+        Parameters:
+            - headers: dict of header key/values
+        """
+
         headers.update(copy.deepcopy(base.base_headers))
         return headers 
         
 
 
     def progress_scan(self, scan_job, agent_id):
+        """update mock scan status
+
+        Moves status from created to active status in preparation for upload
+
+        Parameters:
+            - scan_job:json representing job information for mock scan
+            - agent_id: uuid of agent
+        """
+
         scan_task_id = scan_job['scanId']
         job_authenticator = scan_job['authenticator']
 
@@ -221,7 +250,6 @@ class HuntAgent(object):
 
         check_body = {}
         check_body['elapsed'] = 69
-        #post request to /survey/reply , headers: scanid, authenticator, replytype, body:{"elapsed":1}
 
         response = base.request_post(progress_url, request_headers=check_heads1, request_body=check_body)
         resp_stat = response.status_code
@@ -237,3 +265,5 @@ class HuntAgent(object):
                 raise Exception("Failed!, job not ready for upload")
 
         return [job_authenticator, scan_task_id]
+
+
